@@ -1,43 +1,43 @@
-// Modules to control application life and create native browser window
-const {app, BrowserWindow} = require('electron')
-const path = require('path')
+// Access information about media sources that can be used to capture audio
+// and video from the desktop using the navigator.mediaDevices.getUserMedia API.
+//
+// For more info, see:
+// https://electronjs.org/docs/api/desktop-capturer
 
-function createWindow () {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 800,
+const { app, BrowserWindow, desktopCapturer, screen } = require('electron')
+const path = require('path')
+let mainWindow
+app.whenReady().then(() => {
+  mainWindow = new BrowserWindow({
     height: 600,
+    width: 600,
     webPreferences: {
+      webviewTag: true,
+      nodeIntegration: true,
+      contextIsolation: false,
+      enableRemoteModule: true,
       preload: path.join(__dirname, 'preload.js')
     }
   })
 
-  // and load the index.html of the app.
   mainWindow.loadFile('index.html')
+  mainWindow.webContents.openDevTools({ mode: 'detach' })
+  setTimeout(startCapture, 1000)
+})
 
-  // Open the DevTools.
-  // mainWindow.webContents.openDevTools()
-}
+function startCapture() {
+  let allDisp = screen.getAllDisplays()
+  desktopCapturer.getSources({ types: ['screen'] }).then(async sources => {
+    for (const source of sources) {
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  createWindow()
+      allDisp.forEach((sc, k) => {
+        if (source.display_id == sc.id) {
 
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+          mainWindow.webContents.send('SET_SOURCE', source.id, sc.scaleFactor, sc.size)
+
+        }
+
+      })
+    }
   })
-})
-
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') app.quit()
-})
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
+}
