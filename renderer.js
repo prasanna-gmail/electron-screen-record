@@ -7,7 +7,36 @@
  */
 
 // In the preload script.
-const { ipcRenderer } = require('electron')
+const { ipcRenderer, Menu, dialog } = require('electron')
+
+// Global state
+let mediaRecorder; // MediaRecorder instance to capture footage
+const recordedChunks = [];
+
+
+const startBtn = document.getElementById('startBtn');
+startBtn.onclick = e => {
+    mediaRecorder.start();
+    startBtn.classList.add('is-danger');
+    startBtn.innerText = 'Recording';
+};
+
+const stopBtn = document.getElementById('stopBtn');
+
+stopBtn.onclick = e => {
+    mediaRecorder.stop();
+    startBtn.classList.remove('is-danger');
+    startBtn.innerText = 'Start';
+};
+
+const videoSelectBtn = document.getElementById('videoSelectBtn');
+videoSelectBtn.onclick = getVideoSources;
+
+
+
+
+// Buttons
+const videoElement = document.querySelector('video');
 
 ipcRenderer.on('SET_SOURCE', async (event, sourceId, scaleFactor, size) => {
     try {
@@ -28,30 +57,50 @@ ipcRenderer.on('SET_SOURCE', async (event, sourceId, scaleFactor, size) => {
     } catch (e) {
         handleError(e)
     }
+
+
+
 })
 
 function handleStream(stream, scaleFactor, size) {
-    const video = document.querySelector('video')
-    video.srcObject = stream
-    video.onloadedmetadata = function (e) {
-        video.play()
-        console.log('video.size', this.videoWidth, this.videoHeight)
-        var canvas = document.getElementById('screenshot-canvas')
-        canvas.width = this.videoWidth
-        canvas.height = this.videoHeight
-        var ctx = canvas.getContext('2d')
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-        video.remove()
-        document.getElementById('screenshot-img').src = canvas.toDataURL("image/png")
-        document.getElementById('screenshot-img').style.display = "block"
-        console.log('screen-size,scaleFactor', size, scaleFactor)
-        console.log('screenshot-img:size:',
-            canvas.width,
-            canvas.height)
 
-    }
+    // Preview the source in a video element
+    // const video = document.querySelector('video')
+    // console.log("pkp:  ~ file: renderer.js:43 ~ handleStream ~ video", video)
+    // video.srcObject = stream
+    // video.onloadedmetadata = (e) => video.play()
+
+    // Create the Media Recorder
+    const options = { mimeType: 'video/webm; codecs=vp9' };
+    mediaRecorder = new MediaRecorder(stream, options);
+
+    // Register Event Handlers
+    mediaRecorder.ondataavailable = handleDataAvailable;
+    mediaRecorder.onstop = handleStop;
+
+    // Updates the UI
+
 }
-
 function handleError(e) {
     console.log(e)
 }
+
+// Captures all recorded chunks
+function handleDataAvailable(e) {
+    console.log('video data available');
+    recordedChunks.push(e.data);
+}
+// Saves the video file on stop
+async function handleStop(e) {
+    const blob = new Blob(recordedChunks, {
+        type: 'video/webm; codecs=vp9'
+    });
+    const buffer = Buffer.from(await blob.arrayBuffer());
+    console.log("pkp:  ~ file: renderer.js:119 ~ handleStop ~ buffer", buffer)
+    var arg1 = {
+        "msg": "stopRecord",
+        "buffer": buffer
+    }
+    ipcRenderer.send('onEvent', arg1)
+}
+

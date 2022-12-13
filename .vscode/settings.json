@@ -1,0 +1,12 @@
+{
+    "conventionalCommits.scopes": [
+        "assignment",
+        "browsebook",
+        "commitlint",
+        "practice",
+        "revise",
+        "studyplan",
+        "test",
+        "screenrecord"
+    ]
+}
